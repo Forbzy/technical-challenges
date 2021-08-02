@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webpage
+  labels:
+    app.kubernetes.io/name: webpage
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webpage
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: webpage
+    spec:
+      containers:
+      - env:
+        image: nginx:latest
+        imagePullPolicy: IfNotPresent
+        name: webpage
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: config-volume
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: config-volume
+        configMap:
+          name: index
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webpage
+  labels:
+    app.kubernetes.io/name: webpage
+spec:
+  type: "ClusterIP"
+  ports:
+  - name: "http"
+    port: 80
+    targetPort: 80
+  selector:
+    app.kubernetes.io/name: webpage
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: ca-issuer
+    meta.helm.sh/release-name: webpage
+    meta.helm.sh/release-namespace: default
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.org/mergeable-ingress-type: minion
+  labels:
+    app.kubernetes.io/name: webpage
+  name: webpage
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: host.docker.internal
+    http:
+      paths:
+      - backend:
+          service: 
+            name: webpage
+            port:
+              number: 80
+        pathType: Prefix
+        path: /webpage
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: index
+  namespace: default
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <style>
+    table,th,td {
+      border : 1px solid black;
+      border-collapse: collapse;
+    }
+    th,td {
+      padding: 5px;
+    }
+    </style>
+    <body>
+    username: <input type="string" name="a" id="a"><br> 
+    password: <input type="string" name="b" id="b"><br>
+    <button type="button" onclick="loadXMLDoc(document.getElementById('a').value,document.getElementById('b').value)">Press Me</button>
+    <br><br>
+    <table id="demo"></table>
+
+    <script>
+    function loadXMLDoc(username, password) {
+        var url = "https://host.docker.internal/webhook-service";
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", url);
+
+        xhr.setRequestHeader("Accept", "application/json");
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        xhr.onreadystatechange = function () {
+           if (xhr.readyState === 4) {
+              console.log(xhr.status);
+              console.log(xhr.responseText);
+              document.getElementById("response").innerHTML = JSON.stringify(JSON.parse(xhr.responseText), null, 2);
+           }};
+
+        var data = `{
+          "spec": {
+            "token": "${username}:${password}"
+          }
+        }`;
+
+        xhr.send(data); 
+    }
+    </script>
+    
+    <pre id="response"></pre>
+
+    </body>
+    </html>
