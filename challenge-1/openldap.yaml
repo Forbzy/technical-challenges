@@ -87,28 +87,3 @@ data:
     ou: devops
     cn: james
     userPassword: admin123
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: openldap
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: webpage
-  policyTypes:
-  - Egress
-  - Ingress
----
-apiVersion: crd.projectcalico.org/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-tcp-6379
-spec:
-  selector: app.kubernetes.io/name == 'webpage'
-  types:
-  - Ingress
-  ingress:
-  - action: deny
-    protocol: TCP
-    source: {}
